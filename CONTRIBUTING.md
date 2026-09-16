@@ -8,8 +8,7 @@ Thanks for considering a contribution to favorites-manager!
 git clone https://github.com/tuanductran/favorites-manager.git
 cd favorites-manager
 uv venv
-uv pip install -e .
-uv pip install pytest
+uv pip install -e ".[dev]"
 ```
 
 ## Running tests
