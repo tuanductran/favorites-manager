@@ -20,18 +20,18 @@ console = Console()
 
 @click.group()
 def main() -> None:
-    """favorites: công cụ quản lý favorites/bookmarks đa trình duyệt."""
+    """favorites: a tool for managing favorites/bookmarks across multiple browsers."""
 
 
 @main.command()
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
 def stats(files: tuple[str, ...]) -> None:
-    """Thống kê nhanh: tổng bookmark, số folder, số trùng lặp cho từng file."""
-    table = Table(title="Thống kê favorites")
+    """Quick stats: total bookmarks, folder count, and duplicate count for each file."""
+    table = Table(title="Favorites stats")
     table.add_column("File")
     table.add_column("Bookmarks", justify="right")
     table.add_column("Folders", justify="right")
-    table.add_column("Trùng lặp", justify="right")
+    table.add_column("Duplicates", justify="right")
     for f in files:
         root = parse_file(f)
         n_folders = sum(1 for _ in root.walk_folders()) - 1
@@ -42,12 +42,12 @@ def stats(files: tuple[str, ...]) -> None:
 
 @main.command()
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
-@click.option("-o", "--output", required=True, type=click.Path(), help="File HTML kết quả.")
+@click.option("-o", "--output", required=True, type=click.Path(), help="Output HTML file.")
 @click.option(
-    "--keep-empty-folders", is_flag=True, help="Giữ lại folder rỗng sau khi xoá trùng lặp."
+    "--keep-empty-folders", is_flag=True, help="Keep empty folders after removing duplicates."
 )
 def dedupe(files: tuple[str, ...], output: str, keep_empty_folders: bool) -> None:
-    """Gộp 1+ file bookmark, xoá trùng lặp theo URL, ghi ra file HTML mới."""
+    """Merge one or more bookmark files, remove URL duplicates, and write the result to a new HTML file."""
     roots = [parse_file(f) for f in files]
     names = [click.format_filename(f) for f in files]
     merged = merge_folders(roots, names) if len(roots) > 1 else roots[0]
@@ -58,39 +58,39 @@ def dedupe(files: tuple[str, ...], output: str, keep_empty_folders: bool) -> Non
 
     write_file(merged, output)
     console.print(
-        f"[green]Đã xoá {removed} bookmark trùng lặp.[/green] "
-        f"Còn lại {merged.count_bookmarks()} bookmark -> [bold]{output}[/bold]"
+        f"[green]Removed {removed} duplicate bookmarks.[/green] "
+        f"{merged.count_bookmarks()} bookmarks remain -> [bold]{output}[/bold]"
     )
 
 
 @main.command(name="list-duplicates")
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
 def list_duplicates(files: tuple[str, ...]) -> None:
-    """Liệt kê chi tiết các nhóm bookmark trùng lặp (không sửa file)."""
+    """List duplicate bookmark groups in detail (doesn't modify any file)."""
     roots = [parse_file(f) for f in files]
     names = [click.format_filename(f) for f in files]
     merged = merge_folders(roots, names) if len(roots) > 1 else roots[0]
 
     groups = find_duplicates(merged)
     if not groups:
-        console.print("[green]Không có bookmark trùng lặp.[/green]")
+        console.print("[green]No duplicate bookmarks found.[/green]")
         return
     for g in groups:
         console.print(f"\n[bold yellow]{g.normalized_url}[/bold yellow]")
-        console.print(f"  giữ lại : {g.kept.title}")
+        console.print(f"  kept   : {g.kept.title}")
         for r in g.removed:
-            console.print(f"  bỏ      : {r.title}")
-    console.print(f"\n[bold]Tổng: {len(groups)} nhóm, {sum(len(g.removed) for g in groups)} bookmark thừa.[/bold]")
+            console.print(f"  dropped: {r.title}")
+    console.print(f"\n[bold]Total: {len(groups)} group(s), {sum(len(g.removed) for g in groups)} redundant bookmark(s).[/bold]")
 
 
 @main.command()
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
-@click.option("-o", "--output", required=True, type=click.Path(), help="File HTML kết quả.")
-@click.option("--min-group-size", default=2, show_default=True, help="Số bookmark tối thiểu để tách domain thành folder riêng.")
-@click.option("--dedupe/--no-dedupe", default=True, show_default=True, help="Xoá trùng lặp trước khi phân loại.")
+@click.option("-o", "--output", required=True, type=click.Path(), help="Output HTML file.")
+@click.option("--min-group-size", default=2, show_default=True, help="Minimum bookmark count for a domain to get its own folder.")
+@click.option("--dedupe/--no-dedupe", default=True, show_default=True, help="Remove duplicates before organizing.")
 def organize(files: tuple[str, ...], output: str, min_group_size: int, dedupe: bool) -> None:
-    """Gộp file, (tuỳ chọn) xoá trùng lặp, rồi phân loại bookmark theo domain
-    thành từng folder, ghi ra file HTML mới."""
+    """Merge files, (optionally) remove duplicates, then group bookmarks by
+    domain into folders, and write the result to a new HTML file."""
     roots = [parse_file(f) for f in files]
     names = [click.format_filename(f) for f in files]
     merged = merge_folders(roots, names) if len(roots) > 1 else roots[0]
@@ -101,28 +101,28 @@ def organize(files: tuple[str, ...], output: str, min_group_size: int, dedupe: b
     organized = organize_by_domain(merged, min_group_size=min_group_size)
     write_file(organized, output)
     console.print(
-        f"[green]Đã phân loại {organized.count_bookmarks()} bookmark thành "
-        f"{len(organized.subfolders)} folder theo domain[/green] -> [bold]{output}[/bold]"
+        f"[green]Organized {organized.count_bookmarks()} bookmarks into "
+        f"{len(organized.subfolders)} folder(s) by domain[/green] -> [bold]{output}[/bold]"
     )
 
 
 @main.command()
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
-@click.option("-o", "--output", required=True, type=click.Path(), help="File HTML kết quả.")
+@click.option("-o", "--output", required=True, type=click.Path(), help="Output HTML file.")
 def merge(files: tuple[str, ...], output: str) -> None:
-    """Chỉ gộp nhiều file bookmark (từ nhiều trình duyệt) thành 1 file,
-    giữ nguyên cấu trúc folder gốc của từng file (không dedupe)."""
+    """Just merge multiple bookmark files (from different browsers) into
+    one file, keeping each file's original folder structure (no dedupe)."""
     roots = [parse_file(f) for f in files]
     names = [click.format_filename(f) for f in files]
     merged = merge_folders(roots, names)
     write_file(merged, output)
-    console.print(f"[green]Đã gộp {merged.count_bookmarks()} bookmark[/green] -> [bold]{output}[/bold]")
+    console.print(f"[green]Merged {merged.count_bookmarks()} bookmarks[/green] -> [bold]{output}[/bold]")
 
 
 @main.command(name="list-folders")
 @click.argument("file", type=click.Path(exists=True))
 def list_folders(file: str) -> None:
-    """In cây folder + số bookmark trong mỗi folder."""
+    """Print the folder tree along with the bookmark count in each folder."""
     root = parse_file(file)
 
     def show(folder: Folder, depth: int = 0) -> None:
@@ -136,27 +136,27 @@ def list_folders(file: str) -> None:
 
 @main.command(name="add-url")
 @click.argument("url")
-@click.option("--title", default=None, help="Tiêu đề hiển thị. Mặc định dùng URL.")
-@click.option("--folder", default="", help='Đường dẫn folder, cách nhau bằng "/", vd "Dev/APIs".')
-@click.option("--tags", default="", help='Danh sách tag, cách nhau bằng dấu phẩy.')
-@click.option("--description", default=None, help="Ghi chú/mô tả (xuất thành thẻ <DD>).")
+@click.option("--title", default=None, help="Display title. Defaults to the URL.")
+@click.option("--folder", default="", help='Folder path, "/"-separated, e.g. "Dev/APIs".')
+@click.option("--tags", default="", help='Comma-separated list of tags.')
+@click.option("--description", default=None, help="Note/description (exported as a <DD> tag).")
 @click.option("--config", "config_path", default="config.json", show_default=True, type=click.Path())
 def add_url(url: str, title: str | None, folder: str, tags: str, description: str | None, config_path: str) -> None:
-    """Thêm 1 URL vào file config.json (tự tạo file nếu chưa có)."""
+    """Add a URL to config.json (creating the file if needed)."""
     entry = add_entry(config_path, url=url, title=title, folder=folder, tags=tags, description=description)
     console.print(
-        f"[green]Đã thêm[/green] {entry.title} -> {entry.url} "
-        f"(folder: {'/'.join(entry.folder) or '(gốc)'}) vào [bold]{config_path}[/bold]"
+        f"[green]Added[/green] {entry.title} -> {entry.url} "
+        f"(folder: {'/'.join(entry.folder) or '(root)'}) to [bold]{config_path}[/bold]"
     )
 
 
 @main.command()
-@click.option("-i", "--input", "input_files", multiple=True, type=click.Path(exists=True), help="File(s) bookmark nguồn (có thể lặp -i nhiều lần).")
-@click.option("--config", "config_path", default=None, type=click.Path(exists=True), help="File config.json chứa URL tự thêm.")
-@click.option("-o", "--output-dir", required=True, type=click.Path(), help="Thư mục ghi các file HTML kết quả.")
-@click.option("--browsers", default=",".join(BROWSERS), show_default=True, help="Danh sách trình duyệt cần xuất, cách nhau bằng dấu phẩy.")
-@click.option("--organize/--no-organize", default=False, show_default=True, help="Phân loại lại theo domain trước khi xuất.")
-@click.option("--min-group-size", default=2, show_default=True, help="Dùng cùng --organize: số bookmark tối thiểu để tách domain riêng.")
+@click.option("-i", "--input", "input_files", multiple=True, type=click.Path(exists=True), help="Source bookmark file(s) (repeat -i for multiple).")
+@click.option("--config", "config_path", default=None, type=click.Path(exists=True), help="config.json file containing manually-added URLs.")
+@click.option("-o", "--output-dir", required=True, type=click.Path(), help="Directory to write the output HTML files into.")
+@click.option("--browsers", default=",".join(BROWSERS), show_default=True, help="Comma-separated list of target browsers.")
+@click.option("--organize/--no-organize", default=False, show_default=True, help="Re-organize by domain before exporting.")
+@click.option("--min-group-size", default=2, show_default=True, help="Used with --organize: minimum bookmark count for a domain to get its own folder.")
 def build(
     input_files: tuple[str, ...],
     config_path: str | None,
@@ -165,11 +165,11 @@ def build(
     organize: bool,
     min_group_size: int,
 ) -> None:
-    """Pipeline đầy đủ: đọc file nguồn (+ config.json) -> gộp -> xoá trùng
-    lặp -> (tuỳ chọn) phân loại theo domain -> xuất 1 file HTML RIÊNG cho
-    mỗi trình duyệt (để import không bị conflict/tạo folder "Imported")."""
+    """Full pipeline: read source file(s) (+ config.json) -> merge -> remove
+    duplicates -> (optionally) organize by domain -> write ONE HTML file PER
+    BROWSER (so importing doesn't conflict/create an "Imported" folder)."""
     if not input_files and not config_path:
-        raise click.UsageError("Cần ít nhất 1 file -i/--input hoặc --config.")
+        raise click.UsageError("Need at least one -i/--input file or --config.")
 
     roots = [parse_file(f) for f in input_files]
     names = [click.format_filename(f) for f in input_files]
@@ -190,8 +190,8 @@ def build(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     browser_list = [b.strip() for b in browsers.split(",") if b.strip()]
-    table = Table(title="Đã xuất theo từng trình duyệt")
-    table.add_column("Trình duyệt")
+    table = Table(title="Exported per browser")
+    table.add_column("Browser")
     table.add_column("File")
     table.add_column("Bookmarks", justify="right")
     for b in browser_list:
@@ -201,38 +201,38 @@ def build(
         table.add_row(b, str(out_path), str(per_browser.count_bookmarks()))
 
     console.print(
-        f"Nguồn: {merged.count_bookmarks() + n_dupes} bookmark, "
-        f"đã thêm {n_manual} từ config, xoá {n_dupes} trùng lặp."
+        f"Source: {merged.count_bookmarks() + n_dupes} bookmarks, "
+        f"added {n_manual} from config, removed {n_dupes} duplicate(s)."
     )
     console.print(table)
 
 
 @main.command(name="check-links")
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--workers", default=10, show_default=True, help="Số kết nối chạy song song.")
-@click.option("--timeout", default=10.0, show_default=True, help="Timeout mỗi request (giây).")
-@click.option("--remove-broken/--no-remove-broken", default=False, show_default=True, help="Xoá luôn link chết và ghi ra --output.")
-@click.option("-o", "--output", default=None, type=click.Path(), help="File HTML ghi lại sau khi xoá link chết (bắt buộc nếu dùng --remove-broken).")
-@click.option("--report", default=None, type=click.Path(), help="Ghi báo cáo chi tiết (JSON) ra file này.")
+@click.option("--workers", default=10, show_default=True, help="Number of concurrent connections.")
+@click.option("--timeout", default=10.0, show_default=True, help="Per-request timeout (seconds).")
+@click.option("--remove-broken/--no-remove-broken", default=False, show_default=True, help="Also remove broken links and write the result to --output.")
+@click.option("-o", "--output", default=None, type=click.Path(), help="HTML file to write after removing broken links (required with --remove-broken).")
+@click.option("--report", default=None, type=click.Path(), help="Write a detailed report (JSON) to this file.")
 def check_links_cmd(
     file: str, workers: int, timeout: float, remove_broken: bool, output: str | None, report: str | None
 ) -> None:
-    """Kiểm tra từng bookmark trong FILE còn sống hay đã chết (404/lỗi kết
-    nối/...). Chạy song song bằng thread pool, có thể mất vài phút với file
-    lớn (khoảng vài trăm bookmark)."""
+    """Check whether every bookmark in FILE is alive or dead (404/connection
+    error/...). Runs concurrently via a thread pool; large files (a few
+    hundred bookmarks) can take a couple of minutes."""
     root = parse_file(file)
     total = root.count_bookmarks()
 
-    with click.progressbar(length=total, label="Đang kiểm tra link") as bar:
+    with click.progressbar(length=total, label="Checking links") as bar:
         def _progress(done: int, _total: int) -> None:
             bar.update(done - bar.pos)
 
         results = check_links(root, max_workers=workers, timeout=timeout, progress_cb=_progress)
 
     broken = [r for r in results if not r.ok]
-    table = Table(title=f"Link chết ({len(broken)}/{total})")
+    table = Table(title=f"Broken links ({len(broken)}/{total})")
     table.add_column("Status")
-    table.add_column("Tiêu đề")
+    table.add_column("Title")
     table.add_column("URL")
     for r in sorted(broken, key=lambda r: (r.status_code or 0)):
         status_str = str(r.status_code) if r.status_code else (r.error or "?")
@@ -254,16 +254,16 @@ def check_links_cmd(
             for r in results
         ]
         Path(report).write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        console.print(f"Đã ghi báo cáo đầy đủ -> [bold]{report}[/bold]")
+        console.print(f"Wrote the full report -> [bold]{report}[/bold]")
 
     if remove_broken:
         if not output:
-            raise click.UsageError("Cần --output khi dùng --remove-broken.")
+            raise click.UsageError("--output is required with --remove-broken.")
         broken_urls = {r.bookmark.url for r in broken}
         n = remove_broken_bookmarks(root, broken_urls)
         remove_empty_folders(root)
         write_file(root, output)
-        console.print(f"[green]Đã xoá {n} link chết[/green] -> [bold]{output}[/bold]")
+        console.print(f"[green]Removed {n} broken link(s)[/green] -> [bold]{output}[/bold]")
 
 
 if __name__ == "__main__":

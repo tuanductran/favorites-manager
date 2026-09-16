@@ -1,5 +1,5 @@
-"""Ghi cây Folder/Bookmark ra file HTML chuẩn Netscape Bookmark, import được
-vào Chrome, Edge, Firefox, Brave, Cốc Cốc, Safari, ..."""
+"""Write a Folder/Bookmark tree back out as a standard Netscape Bookmark
+HTML file, importable into Chrome, Edge, Firefox, Brave, Coc Coc, Safari, ..."""
 from __future__ import annotations
 
 from html import escape

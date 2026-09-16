@@ -1,9 +1,26 @@
 [project]
 name = "favorites-manager"
 version = "0.1.0"
-description = "Quản lý favorites/bookmarks trên nhiều trình duyệt: gộp, lọc trùng, phân loại folder, xuất HTML để import lại vào trình duyệt."
+description = "Manage favorites/bookmarks across multiple browsers: merge, dedupe, organize into folders, and export HTML for re-import into browsers."
 readme = "README.md"
 requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Tuan Duc Tran" }
+]
+keywords = ["bookmarks", "favorites", "browser", "netscape-bookmark", "chrome", "firefox"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
 dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
@@ -11,6 +28,11 @@ dependencies = [
     "rich>=13.7",
     "requests>=2.31",
 ]
+
+[project.urls]
+Homepage = "https://github.com/tuanductran/favorites-manager"
+Repository = "https://github.com/tuanductran/favorites-manager"
+Issues = "https://github.com/tuanductran/favorites-manager/issues"
 
 [project.scripts]
 favorites = "favorites_manager.cli:main"

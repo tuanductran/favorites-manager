@@ -1,19 +1,20 @@
-"""Parse file favorites/bookmarks dạng Netscape Bookmark HTML (chuẩn xuất ra
-từ Chrome, Edge, Firefox, Cốc Cốc, Brave, ...) thành cây Folder/Bookmark.
+"""Parse a Netscape Bookmark HTML file (the format exported by Chrome, Edge,
+Firefox, Coc Coc, Brave, ...) into a Folder/Bookmark tree.
 
-Cấu trúc file gốc (đơn giản hoá):
+Rough shape of the source file:
 
     <DL><p>
-        <DT><H3 ...>Tên folder</H3>
+        <DT><H3 ...>Folder name</H3>
         <DL><p>
-            <DT><A HREF="...">Tên bookmark</A>
-            <DT><H3 ...>Folder con</H3>
+            <DT><A HREF="...">Bookmark name</A>
+            <DT><H3 ...>Subfolder</H3>
             <DL><p> ... </DL><p>
         </DL><p>
     </DL><p>
 
-Vì đây không phải XHTML hợp lệ (thẻ không đóng), ta dùng BeautifulSoup với
-parser "html.parser"/"lxml" để nó tự sửa cây DOM tương tự trình duyệt.
+This isn't valid XHTML (tags are never closed), so we use BeautifulSoup with
+the "html.parser"/"lxml" backend, which repairs the DOM tree the same way a
+browser would.
 """
 from __future__ import annotations
 
@@ -24,18 +25,19 @@ from bs4 import BeautifulSoup, Tag
 
 from .models import Bookmark, Folder
 
-# File Netscape Bookmark không đóng thẻ <DT>/<DD> (giống <li>): trình duyệt
-# tự "auto-close" mục đang mở khi gặp <DT>/<DD> mới HOẶC khi gặp </DL> đóng
-# chính cấp <DL> đang chứa nó — nhưng <DT> vẫn có thể "bao" một <DL> lồng
-# bên trong nó (folder con). html.parser của BeautifulSoup không hiểu luật
-# này nên cần tiền xử lý: dùng một stack để chèn thẻ đóng đúng chỗ, dựa
-# theo độ sâu <DL>/</DL> (vốn đã được đóng mở cân bằng sẵn trong file gốc).
+# Netscape Bookmark files never close <DT>/<DD> (much like <li>): browsers
+# auto-close the currently open item whenever a new <DT>/<DD> appears, OR
+# when the enclosing <DL> is closed — but a <DT> can still "contain" a
+# nested <DL> (a subfolder). BeautifulSoup's html.parser doesn't know this
+# rule, so we pre-process the text with a stack to insert the right closing
+# tag at the right place, based on <DL>/</DL> nesting depth (which is
+# already balanced in the source file).
 _TOKEN_RE = re.compile(r"(?i)<DL>|</DL>|<DT>|<DD>")
 
 
 def _normalize_netscape_html(html: str) -> str:
     out: list[str] = []
-    # phần tử: ("dl",) hoặc ("item", "dt"|"dd")
+    # stack entries: ("dl",) or ("item", "dt"|"dd")
     stack: list[tuple] = []
     pos = 0
     for m in _TOKEN_RE.finditer(html):
@@ -64,7 +66,7 @@ def _normalize_netscape_html(html: str) -> str:
 
 
 def parse_file(path: str | Path) -> Folder:
-    """Đọc 1 file HTML bookmark và trả về Folder gốc ("root")."""
+    """Read a single bookmark HTML file and return the root Folder ("root")."""
     html = Path(path).read_text(encoding="utf-8", errors="replace")
     return parse_html(html)
 
@@ -74,7 +76,7 @@ def parse_html(html: str) -> Folder:
     soup = BeautifulSoup(html, "html.parser")
     root = Folder(name="root")
 
-    # Toàn bộ bookmark/folder nằm trong <DL> đầu tiên ở cấp cao nhất.
+    # Every bookmark/folder lives inside the top-level <DL>.
     top_dl = soup.find("dl")
     if top_dl is not None:
         _parse_dl(top_dl, root)
@@ -82,12 +84,12 @@ def parse_html(html: str) -> Folder:
 
 
 def _parse_dl(dl: Tag, parent: Folder) -> None:
-    """Duyệt các <DT> trực tiếp bên trong 1 thẻ <DL>, đổ vào `parent`.
+    """Walk the direct <DT> children of a <DL>, filling in `parent`.
 
-    Lưu ý: BeautifulSoup (html.parser) tự động bọc nội dung <DL><p> thành
-    <dl><p>...</p></dl>, và vì <DT> không có thẻ đóng, <DL> con lại lồng
-    *bên trong* <dt> cha thay vì là sibling. Nên ta duyệt qua toàn bộ
-    <dt> con cháu ở "độ sâu gần nhất" bằng cách xét container <p> nếu có.
+    Note: after normalization, nested <DL>s (containing a folder's
+    children) end up as siblings of the <p> wrapper, but the folder's own
+    <DL> is a child of the corresponding <dt>. Direct <dt> children may sit
+    under an auto-inserted <p> wrapper, so check for that first.
     """
     container = dl.find("p", recursive=False) or dl
     for dt in container.find_all("dt", recursive=False):
@@ -96,14 +98,14 @@ def _parse_dl(dl: Tag, parent: Folder) -> None:
 
         if h3 is not None:
             folder = Folder(
-                name=h3.get_text(strip=True) or "(Không tên)",
+                name=h3.get_text(strip=True) or "(untitled)",
                 add_date=h3.get("add_date"),
                 last_modified=h3.get("last_modified"),
                 personal_toolbar=(h3.get("personal_toolbar_folder") == "true"),
             )
             parent.subfolders.append(folder)
-            # Sau khi chuẩn hoá, <DL> con nằm lồng bên trong chính <dt> này
-            # (thử thêm sibling để phòng trường hợp trình duyệt xuất khác).
+            # After normalization, the child <DL> is nested inside this
+            # same <dt> (try a sibling too, in case some exporter differs).
             child_dl = dt.find("dl", recursive=False) or dt.find_next_sibling("dl")
             if child_dl is not None:
                 _parse_dl(child_dl, folder)
@@ -115,13 +117,12 @@ def _parse_dl(dl: Tag, parent: Folder) -> None:
             tags_raw = a.get("tags") or ""
             tags = tuple(t.strip() for t in tags_raw.split(",") if t.strip())
 
-            # <DD> ghi chú/mô tả nằm ngay sau <DT><A>...</A>, là 1 <dt> sibling
-            # riêng theo cấu trúc gốc (không lồng trong <a>). Sau khi chuẩn
-            # hoá, nó thường xuất hiện làm sibling của <dt> hiện tại.
+            # A <DD> note/description sits right after <DT><A>...</A>, as a
+            # sibling <dt>/<dd> pair after normalization. Only attach it if
+            # it really belongs to this bookmark, i.e. it directly follows
+            # this <dt> with no other <dt> in between.
             description = None
             next_dd = dt.find_next_sibling("dd")
-            # Chỉ nhận <dd> nếu nó thực sự "thuộc về" bookmark này, tức nằm
-            # ngay trước <dt> kế tiếp (nếu có) trong cùng container.
             if next_dd is not None and next_dd.find_previous_sibling("dt") is dt:
                 text = next_dd.get_text(strip=True)
                 description = text or None

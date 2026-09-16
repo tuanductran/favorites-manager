@@ -1,75 +1,77 @@
 # favorites-manager
 
-Công cụ Python 100% (không cần Node/PHP...) để quản lý **favorites/bookmarks**
-xuất ra từ nhiều trình duyệt (Chrome, Edge, Firefox, Cốc Cốc, Brave, Safari...)
-ở định dạng **Netscape Bookmark HTML** — định dạng chuẩn mà mọi trình duyệt
-đều hỗ trợ *xuất* và *import lại*.
+A 100% Python tool (no Node/PHP required) for managing **favorites/bookmarks**
+exported from multiple browsers (Chrome, Edge, Firefox, Coc Coc, Brave,
+Safari...) in the **Netscape Bookmark HTML** format — the standard format
+every browser supports for both *export* and *re-import*.
 
-## Tính năng
+## Features
 
-- **Đọc** file `bookmarks.html` (kể cả file lỗi/không chuẩn, tự chuẩn hoá lại
-  cấu trúc `<DT>`/`<DD>` không đóng thẻ).
-- Giữ nguyên **ghi chú (`<DD>`)** và **ICON_URI** (Firefox) khi đọc/ghi lại —
-  không bị mất dữ liệu như nhiều tool khác chỉ đọc `HREF`. Cũng đọc/ghi được
-  thuộc tính `TAGS=` nếu file nguồn có sẵn (từ các dịch vụ như del.icio.us
-  hoặc tool khác) — lưu ý: Chrome và Firefox **không** tự ghi hay đọc
-  `TAGS=` khi import/export qua HTML (đã xác minh trực tiếp trong mã nguồn
-  của cả hai, xem mục "Nguồn tham khảo" bên dưới), nên đây chỉ là bảo toàn
-  dữ liệu cho khả năng tương thích với các tool khác, không phải tính năng
-  "tag" mà Chrome/Firefox sẽ hiển thị sau khi import.
-- **Gộp** nhiều file từ nhiều trình duyệt thành 1 cây bookmark.
-- **Tìm & xoá trùng lặp** theo URL đã chuẩn hoá (bỏ `/` cuối, fragment `#...`,
-  không phân biệt hoa/thường ở scheme & host); khi trùng, giữ lại bản có
-  `ADD_DATE` sớm nhất.
-- **Phân loại theo folder** tự động dựa trên domain (ví dụ toàn bộ
-  `github.com` gom vào 1 folder).
-- **Tự thêm URL thủ công** qua file `config.json` (sửa tay hoặc qua lệnh
-  `add-url`), hỗ trợ cả `folder`, `tags`, `description`.
-- **Kiểm tra link chết** (404, lỗi kết nối, timeout...) chạy song song bằng
-  thread pool, xuất báo cáo JSON, tuỳ chọn tự xoá link chết.
-- **Xuất riêng file HTML cho từng trình duyệt** (Chrome/Edge/Firefox/Safari/
-  Brave/Cốc Cốc) với đúng tên/flag folder "thanh bookmark" của từng trình
-  duyệt, để import không bị conflict/tạo folder "Imported (ngày)".
+- **Read** a `bookmarks.html` file (even a malformed/non-standard one — it
+  self-normalizes the unclosed `<DT>`/`<DD>` structure).
+- Preserves **notes (`<DD>`)** and **ICON_URI** (Firefox) when reading and
+  writing back — no silent data loss like many other tools that only read
+  `HREF`. Also reads/writes the `TAGS=` attribute if the source file has it
+  (from services like del.icio.us or other tools) — note: Chrome and
+  Firefox do **not** themselves write or read `TAGS=` on HTML import/export
+  (verified directly in both browsers' source code, see "References"
+  below), so this is purely data preservation for compatibility with other
+  tools, not a "tag" feature Chrome/Firefox will display after import.
+- **Merge** multiple files from multiple browsers into one bookmark tree.
+- **Find & remove duplicates** by normalized URL (strips trailing `/`,
+  fragment `#...`, case-insensitive scheme & host); when duplicates are
+  found, the copy with the earliest `ADD_DATE` is kept.
+- **Auto-organize into folders** by domain (e.g. all `github.com` links
+  grouped into one folder).
+- **Manually add URLs** via a `config.json` file (edit by hand or via the
+  `add-url` command), supporting `folder`, `tags`, and `description`.
+- **Check for broken links** (404, connection errors, timeouts...) running
+  concurrently via a thread pool, with a JSON report and an option to
+  auto-remove dead links.
+- **Export one HTML file per browser** (Chrome/Edge/Firefox/Safari/Brave/
+  Coc Coc) with the correct name/flag for each browser's "bookmarks bar"
+  folder, so importing doesn't conflict or create an "Imported (date)"
+  folder.
 
-## Cài đặt (dùng `uv`)
+## Installation (using `uv`)
 
 ```bash
 uv venv
 uv pip install -e .
 ```
 
-Yêu cầu Python **3.9+**. Thư viện dùng: `beautifulsoup4`, `lxml`, `click`,
-`rich`, `requests` (đều thuần Python, không cần build native phức tạp).
+Requires Python **3.9+**. Dependencies: `beautifulsoup4`, `lxml`, `click`,
+`rich`, `requests` (all pure Python, no complex native builds needed).
 
-## Sử dụng (CLI: `favorites`)
+## Usage (CLI: `favorites`)
 
 ```bash
-# Xem thống kê (số bookmark, số folder, số trùng lặp) cho 1 hoặc nhiều file
+# Quick stats (bookmark count, folder count, duplicate count) for one or more files
 favorites stats chrome.html firefox.html
 
-# Xem chi tiết từng nhóm trùng lặp, không sửa file
+# List duplicate groups in detail, without modifying a file
 favorites list-duplicates chrome.html
 
-# Gộp nhiều file + xoá trùng lặp -> ghi ra file mới, import lại vào trình duyệt
+# Merge multiple files + remove duplicates -> write a new file, re-import into a browser
 favorites dedupe chrome.html firefox.html -o merged_clean.html
 
-# Gộp nhiều file, giữ nguyên cấu trúc folder gốc (không xoá trùng lặp)
+# Merge multiple files, keeping the original folder structure (no dedupe)
 favorites merge chrome.html firefox.html -o merged.html
 
-# Gộp + xoá trùng lặp + tự phân loại folder theo domain
+# Merge + remove duplicates + auto-organize into folders by domain
 favorites organize chrome.html firefox.html -o organized.html \
     --min-group-size 3
 
-# In cây folder hiện có của 1 file
+# Print the existing folder tree for a file
 favorites list-folders chrome.html
 ```
 
-### Tự thêm URL qua file `config.json`
+### Manually adding URLs via `config.json`
 
-Không cần sửa code, chỉ cần thêm URL vào `config.json` rồi để chương trình
-đọc và chèn vào lúc build. Có 2 cách thêm:
+No code changes needed — just add a URL to `config.json` and let the
+program read and merge it in at build time. There are two ways to add one:
 
-**1. Sửa tay file JSON** (tạo `config.json` nếu chưa có):
+**1. Edit the JSON file by hand** (create `config.json` if it doesn't exist yet):
 
 ```json
 {
@@ -80,29 +82,29 @@ Không cần sửa code, chỉ cần thêm URL vào `config.json` rồi để ch
 }
 ```
 
-`folder` dùng `/` để phân cấp; để trống hoặc bỏ qua nếu muốn thêm vào gốc.
-Folder chưa tồn tại sẽ tự được tạo khi build.
+`folder` uses `/` to express nesting; leave it out or empty to add to the
+root. Folders that don't exist yet are created automatically at build time.
 
-**2. Dùng lệnh CLI** (tự ghi vào config.json, không cần mở file):
+**2. Use the CLI command** (writes to config.json for you, no need to open the file):
 
 ```bash
 favorites add-url "https://claude.ai" --title "Claude" --folder "AI Tools" --config config.json
 favorites add-url "https://github.com/tuanductran" --title "My GitHub" --folder "Dev/Profile" --config config.json
 ```
 
-### Build ra output riêng cho từng trình duyệt (tránh conflict khi import)
+### Building per-browser output (avoiding import conflicts)
 
-Mỗi trình duyệt nhận diện "thanh bookmark" (bookmarks bar) qua thuộc tính
-`PERSONAL_TOOLBAR_FOLDER="true"` trên `<H3>`, chứ không phải theo tên —
-nhưng tên hiển thị và cách gộp khi import lại khác nhau giữa các trình
-duyệt (Chrome/Edge/Brave/Cốc Cốc gọi là "Bookmarks bar"/"Favorites bar",
-Firefox gọi là "Bookmarks Toolbar", Safari gọi là "Favorites"). Import 1
-file dùng chung dễ khiến trình duyệt tạo thêm folder "Imported (ngày)"
-thay vì gộp thẳng vào thanh bookmark có sẵn.
+Every browser recognizes its "bookmarks bar" through the
+`PERSONAL_TOOLBAR_FOLDER="true"` attribute rather than by name — but the
+displayed name and merge behavior differ between browsers
+(Chrome/Edge/Brave/Coc Coc call it "Bookmarks bar"/"Favorites bar", Firefox
+calls it "Bookmarks Toolbar", Safari calls it "Favorites"). Importing one
+shared file often makes the browser create an extra "Imported (date)"
+folder instead of merging straight into the existing toolbar.
 
-Lệnh `build` giải quyết việc này: đọc file nguồn + `config.json`, gộp, xoá
-trùng lặp, rồi xuất **1 file HTML riêng cho mỗi trình duyệt**, mỗi file có
-tên folder thanh công cụ đúng quy ước của trình duyệt đó:
+The `build` command handles this: it reads the source file(s) +
+`config.json`, merges, removes duplicates, then exports **one HTML file per
+browser**, each with the correct toolbar-folder name for that browser:
 
 ```bash
 favorites build \
@@ -111,40 +113,33 @@ favorites build \
     -o dist \
     --browsers chrome,firefox,edge,safari
 
-# thêm --organize --min-group-size 3 nếu muốn phân loại theo domain luôn
+# add --organize --min-group-size 3 if you also want domain-based organization
 ```
 
-Kết quả: `dist/chrome.html`, `dist/firefox.html`, `dist/edge.html`,
-`dist/safari.html` — import file tương ứng vào đúng trình duyệt đó.
+Result: `dist/chrome.html`, `dist/firefox.html`, `dist/edge.html`,
+`dist/safari.html` — import the matching file into its target browser.
 
-### Kiểm tra link chết
+### Checking for broken links
 
 ```bash
-# Chỉ xem báo cáo, không sửa file
+# Just view the report, don't modify the file
 favorites check-links bookmarks.html --workers 15 --timeout 8 --report dead-links.json
 
-# Kiểm tra rồi tự xoá link chết, ghi ra file mới
+# Check and auto-remove broken links, writing the result to a new file
 favorites check-links bookmarks.html --remove-broken -o cleaned.html
 ```
 
-Cơ chế: thử `HEAD` trước (nhẹ), nếu server không hỗ trợ (405) hoặc lỗi thì
-fallback sang `GET`; chạy song song bằng `ThreadPoolExecutor` (mặc định 10
-luồng) để không mất hàng giờ với file vài trăm/nghìn bookmark. **Lưu ý hạn
-chế** (giống mọi tool check-link dựa trên HTTP status): một số trang chặn
-bot (Cloudflare/Akamai) có thể báo lỗi dù trang vẫn sống, và trang dạng SPA
-(JS render phía client) có thể trả về `200` dù nội dung thực tế đã mất — nên
-xem báo cáo là gợi ý để rà tay, không tự động tin 100%.
+Mechanism: try `HEAD` first (lightweight); if the server doesn't support it
+(405) or errors, fall back to `GET`; runs concurrently via a
+`ThreadPoolExecutor` (10 threads by default) so it doesn't take hours on a
+file with hundreds/thousands of bookmarks. **Known limitation** (shared by
+any HTTP-status-based link checker): some sites block bots
+(Cloudflare/Akamai) and may report an error even though the page is alive,
+and SPA-style pages (client-side rendered) can return `200` even though the
+actual content is gone — so treat the report as a lead for manual review,
+not something to trust 100%.
 
-
-Sau khi có file `.html` kết quả, vào trình duyệt đích:
-
-- **Chrome/Edge/Brave/Cốc Cốc**: `chrome://bookmarks` (hoặc `edge://favorites`)
-  → menu (⋮) → *Import bookmarks* → chọn file `.html`.
-- **Firefox**: `about:preferences` → *Bookmarks* (Thư viện) → *Import and
-  Backup* → *Import Bookmarks from HTML...*.
-- **Safari**: File → Import From → Bookmarks HTML File...
-
-## Dùng như thư viện Python
+## Using it as a Python library
 
 ```python
 from favorites_manager.parser import parse_file
@@ -158,74 +153,80 @@ organized = organize_by_domain(root, min_group_size=3)
 write_file(organized, "organized.html")
 ```
 
-## Cấu trúc project
+## Project structure
 
 ```
 favorites-manager/
 ├── pyproject.toml
 ├── README.md
+├── config.json          # example config: 493 bookmarks converted from a real export
 ├── src/favorites_manager/
-│   ├── models.py     # Bookmark, Folder (dataclass)
-│   ├── parser.py      # đọc Netscape Bookmark HTML -> cây Folder
-│   ├── writer.py       # cây Folder -> Netscape Bookmark HTML
-│   ├── dedupe.py       # tìm/xoá trùng lặp, xoá folder rỗng
-│   ├── organize.py     # gộp nhiều nguồn, phân loại theo domain
-│   ├── config.py        # đọc/ghi config.json (URL tự thêm)
-│   ├── browsers.py      # xuất riêng theo từng trình duyệt
-│   ├── linkcheck.py     # kiểm tra link chết (song song)
-│   └── cli.py           # CLI (click)
+│   ├── models.py     # Bookmark, Folder (dataclasses)
+│   ├── parser.py      # parses Netscape Bookmark HTML -> a Folder tree
+│   ├── writer.py       # writes a Folder tree -> Netscape Bookmark HTML
+│   ├── dedupe.py       # find/remove duplicates, remove empty folders
+│   ├── organize.py     # merge multiple sources, organize by domain
+│   ├── config.py        # read/write config.json (manually-added URLs)
+│   ├── browsers.py      # per-browser export
+│   ├── linkcheck.py     # broken-link checking (concurrent)
+│   └── cli.py            # CLI (click)
 └── tests/
     └── test_roundtrip.py
 ```
 
-## Ghi chú kỹ thuật
+## Technical notes
 
-File Netscape Bookmark không đóng thẻ `<DT>` (giống `<li>` trong `<ul>`), nên
-`BeautifulSoup` (html.parser) mặc định sẽ lồng sai cây DOM. `parser.py` có 1
-bước tiền xử lý bằng stack để chèn `</dt>`/`</dd>` đúng vị trí (dựa theo độ
-sâu `<DL>`/`</DL>` vốn đã cân bằng sẵn trong file gốc) trước khi parse.
+Netscape Bookmark files never close the `<DT>`/`<DD>` tags (much like `<li>`
+inside a `<ul>`), so `BeautifulSoup` (html.parser) will nest the DOM tree
+incorrectly by default. `parser.py` runs a pre-processing pass with a stack
+to insert `</dt>`/`</dd>` at the right place (based on `<DL>`/`</DL>`
+nesting, which is already balanced in the source file) before parsing.
 
-## Đã audit / các lỗi đã vá
+## Audit history / bugs fixed
 
-- **Nhiều `PERSONAL_TOOLBAR_FOLDER="true"` khi gộp nhiều nguồn**: khi
-  `build` gộp 2+ file (mỗi file có 1 folder toolbar riêng của trình duyệt
-  gốc), bản build-per-browser trước đây chỉ đổi tên folder toolbar ĐẦU
-  TIÊN tìm thấy, để sót các folder toolbar khác vẫn mang cờ `true` ->
-  browser đích không biết chọn folder nào làm thanh bookmark. Đã sửa
-  `browsers.py` để luôn tắt cờ ở MỌI folder trước, chỉ bật lại đúng 1.
-- **Mất `tags`/`description` khi xoá trùng lặp**: bản bị xoá trong 1 nhóm
-  trùng lặp có thể có tag/ghi chú riêng mà bản được giữ lại không có ->
-  `dedupe.py` giờ gộp (union) tags và điền `description` còn thiếu từ các
-  bản bị xoá vào bản được giữ lại trước khi xoá.
-- **Rò rỉ kết nối khi check-links**: nhánh fallback GET (`stream=True`)
-  trước đây không đóng response -> có thể cạn connection pool khi quét
-  nhiều URL không hỗ trợ HEAD. Đã bọc bằng context manager (`with ... as
-  resp`) để luôn đóng kết nối.
-- **`favorites build` chạy im lặng khi không có input**: đã thêm kiểm tra
-  bắt buộc phải có ít nhất `-i/--input` hoặc `--config`.
-- Đã test thực tế trên Python **3.9.25** (không chỉ 3.11) để đảm bảo cú
-  pháp type hint hiện đại (`str | None`, `tuple[str, ...]`) hoạt động đúng
-  nhờ `from __future__ import annotations` ở mọi module.
+- **Multiple `PERSONAL_TOOLBAR_FOLDER="true"` when merging sources**: when
+  `build` merges 2+ files (each with its own browser-specific toolbar
+  folder), the per-browser build used to rename only the FIRST toolbar
+  folder it found, leaving the others still flagged `true` — so the target
+  browser has no defined choice of toolbar folder. Fixed in `browsers.py`
+  to always clear the flag on every folder first, then set it on exactly
+  one.
+- **Lost `tags`/`description` when deduping**: a removed duplicate could
+  carry tags/notes the kept copy didn't have. `dedupe.py` now merges
+  (unions) tags and backfills a missing `description` from the removed
+  copies before deleting them.
+- **Connection leak in check-links**: the GET fallback branch
+  (`stream=True`) used to never close the response, which could exhaust
+  the connection pool when scanning many URLs that don't support HEAD.
+  Fixed by wrapping it in a context manager (`with ... as resp`) so the
+  connection is always closed.
+- **`favorites build` running silently with no input**: added a check that
+  requires at least one `-i/--input` or `--config`.
+- Actually tested on Python **3.9.25** (not just 3.11) to confirm modern
+  type-hint syntax (`str | None`, `tuple[str, ...]`) works correctly thanks
+  to `from __future__ import annotations` in every module.
 
-## Nguồn tham khảo (đối chiếu trực tiếp với mã nguồn trình duyệt)
+## References (cross-checked directly against browser source code)
 
-Thay vì chỉ dựa vào blog/bài viết thứ ba, các giả định về định dạng đã được
-đối chiếu trực tiếp với mã nguồn mở của Chromium và Firefox:
+Rather than relying only on third-party blog posts, the format assumptions
+here were cross-checked directly against the open-source code of Chromium
+and Firefox:
 
 - **Chromium** — `chrome/browser/bookmarks/bookmark_html_writer.cc`
   ([chromium.googlesource.com](https://chromium.googlesource.com/chromium/src/+/lkgr/chrome/browser/bookmarks/bookmark_html_writer.cc)):
-  xác nhận phần header file khớp chính xác với `writer.py`; xác nhận
-  `PERSONAL_TOOLBAR_FOLDER="true"` chỉ được Chrome ghi cho folder Bookmarks
-  Bar (không ghi `TAGS`/`ICON_URI`); xác nhận nội dung "Other bookmarks" và
-  "Mobile bookmarks" được Chrome xuất **phẳng ở cấp gốc**, không bọc trong
-  folder riêng — đúng với cách `parser.py` đang xử lý các bookmark nằm trực
-  tiếp ở root.
+  confirms the file header matches `writer.py` exactly; confirms
+  `PERSONAL_TOOLBAR_FOLDER="true"` is written by Chrome only for the
+  Bookmarks Bar folder (it never writes `TAGS`/`ICON_URI`); confirms "Other
+  bookmarks" and "Mobile bookmarks" content is exported by Chrome **flat at
+  the root level**, not wrapped in their own folder — matching how
+  `parser.py` handles bookmarks that sit directly at the root.
 - **Firefox** — `toolkit/components/places/BookmarkHTMLUtils.sys.mjs`
   ([searchfox.org](https://searchfox.org/firefox-main/source/toolkit/components/places/BookmarkHTMLUtils.sys.mjs)):
-  xác nhận `<DD>` là ghi chú gắn với bookmark `<A>` ngay trước đó (đúng
-  logic `parser.py` đang dùng); xác nhận `ICON_URI` là thuộc tính riêng của
-  Firefox; xác nhận Firefox **không** đọc `TAGS=` khi import HTML (danh
-  sách thuộc tính được import: `HREF`, `ICON`, `ICON_URI`, `LAST_CHARSET` —
-  không có `TAGS`); xác nhận cơ chế "folder mới tự động đóng folder cũ
-  cùng cấp khi gặp `<H3>` tiếp theo" giống hệt cách `parser.py` chuẩn hoá
-  bằng stack.
+  confirms `<DD>` is a note attached to the `<A>` bookmark immediately
+  preceding it (matches the logic `parser.py` uses); confirms `ICON_URI` is
+  a Firefox-specific attribute; confirms Firefox does **not** read `TAGS=`
+  on HTML import (the imported attribute list is `HREF`, `ICON`,
+  `ICON_URI`, `LAST_CHARSET` — no `TAGS`); confirms the "a new folder
+  implicitly closes the previous sibling folder when the next `<H3>`
+  appears" mechanism matches exactly how `parser.py` normalizes the file
+  using a stack.

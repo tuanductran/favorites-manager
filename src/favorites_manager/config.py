@@ -1,7 +1,7 @@
-"""Cho phép người dùng tự thêm URL vào 1 file JSON (config), rồi chương
-trình đọc file này để chèn vào cây bookmark trước khi xuất ra.
+"""Let the user add URLs manually to a JSON file (config.json), which the
+program reads and merges into the bookmark tree before exporting.
 
-Định dạng config.json:
+config.json format:
 
     {
       "bookmarks": [
@@ -14,10 +14,10 @@ trình đọc file này để chèn vào cây bookmark trước khi xuất ra.
       ]
     }
 
-- "folder": đường dẫn folder, phân cách bằng "/". Nếu không có, bookmark
-  được thêm vào folder gốc. Folder chưa tồn tại sẽ tự được tạo.
-- "add_date": tuỳ chọn, epoch seconds (dạng Netscape). Bỏ trống nếu không
-  cần, hệ thống sẽ để trống khi xuất (trình duyệt tự gán khi import).
+- "folder": a "/"-separated folder path. If omitted, the bookmark is added
+  to the root folder. Folders that don't exist yet are created automatically.
+- "add_date": optional, epoch seconds (Netscape-style). Leave it out if not
+  needed — the browser will assign one on import.
 """
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ def add_entry(
     tags: str = "",
     description: str | None = None,
 ) -> ManualEntry:
-    """Thêm 1 URL vào file config.json (tạo file nếu chưa có), ghi lại luôn."""
+    """Add a URL to config.json (creating the file if needed), saving immediately."""
     entries = load_config(path)
     entry = ManualEntry(
         url=url,
@@ -118,7 +118,7 @@ def _get_or_create_folder(root: Folder, path: tuple[str, ...]) -> Folder:
 
 
 def apply_entries(root: Folder, entries: list[ManualEntry]) -> int:
-    """Chèn các ManualEntry vào cây `root` (in-place). Trả về số lượng đã thêm."""
+    """Insert ManualEntry items into the `root` tree (in-place). Returns the count added."""
     for entry in entries:
         target = _get_or_create_folder(root, entry.folder)
         target.bookmarks.append(

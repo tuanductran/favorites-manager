@@ -1,9 +1,10 @@
-"""Tìm & loại bỏ bookmark trùng lặp trong cây Folder, theo URL đã chuẩn hoá.
+"""Find & remove duplicate bookmarks in a Folder tree, based on normalized URL.
 
-Chiến lược giữ lại bản ghi nào khi có trùng lặp:
-    - Ưu tiên bookmark có ADD_DATE nhỏ hơn (thêm sớm hơn = bản gốc).
-    - Nếu không có ADD_DATE, giữ bookmark gặp đầu tiên khi duyệt cây
-      (duyệt theo thứ tự folder cha -> folder con, trái sang phải).
+Which copy is kept when duplicates are found:
+    - Prefer the bookmark with the earlier ADD_DATE (added first = the
+      original).
+    - If there's no ADD_DATE, keep whichever copy is encountered first
+      while walking the tree (parent folder -> child folders, left to right).
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ def _add_date_key(bm: Bookmark) -> int:
 
 
 def find_duplicates(root: Folder) -> list[DuplicateGroup]:
-    """Gom nhóm các bookmark có cùng normalized_url, không sửa cây gốc."""
+    """Group bookmarks that share the same normalized_url, without mutating the tree."""
     groups: dict[str, list[Bookmark]] = {}
     for bm in root.walk_bookmarks():
         groups.setdefault(bm.normalized_url, []).append(bm)
@@ -43,13 +44,13 @@ def find_duplicates(root: Folder) -> list[DuplicateGroup]:
 
 
 def remove_duplicates(root: Folder) -> int:
-    """Xoá bookmark trùng lặp trực tiếp trên cây `root` (in-place).
+    """Remove duplicate bookmarks directly on the `root` tree (in-place).
 
-    Trước khi xoá, GỘP `tags`/`description` từ các bản bị xoá vào bản được
-    giữ lại (nếu bản giữ lại đang thiếu) để không mất dữ liệu người dùng đã
-    gắn cho bookmark trùng.
+    Before removing, MERGE `tags`/`description` from the removed copies
+    into the kept copy (if the kept copy is missing them), so data the user
+    attached to a duplicate isn't silently lost.
 
-    Trả về số lượng bookmark đã bị xoá.
+    Returns the number of bookmarks removed.
     """
     duplicate_groups = find_duplicates(root)
     to_remove_ids = set()
@@ -83,9 +84,9 @@ def remove_duplicates(root: Folder) -> int:
 
 
 def remove_empty_folders(root: Folder) -> int:
-    """Xoá đệ quy các folder rỗng (không bookmark, không folder con).
-    Trả về số lượng folder đã xoá. Không xoá folder gốc/personal-toolbar
-    nếu nó là root truyền vào trực tiếp."""
+    """Recursively remove empty folders (no bookmarks, no subfolders).
+    Returns the number of folders removed. Never removes the `root` object
+    itself, even if it ends up empty."""
     removed_count = 0
 
     def _clean(folder: Folder) -> None:

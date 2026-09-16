@@ -1,11 +1,12 @@
-"""Kiểm tra bookmark nào đã chết (404, DNS lỗi, timeout, ...), chạy song
-song bằng ThreadPoolExecutor (network I/O-bound nên không cần asyncio).
+"""Check which bookmarks are dead (404, DNS failure, timeout, ...), running
+concurrently via ThreadPoolExecutor (network I/O-bound, so no need for
+asyncio here).
 
-Chiến lược:
-    - Thử HEAD trước (nhẹ, tiết kiệm băng thông).
-    - Một số server không hỗ trợ HEAD (trả 405) -> fallback sang GET.
-    - Có timeout + giới hạn concurrency để tránh bị chặn/rate-limit.
-    - Coi 2xx/3xx là "sống"; 4xx/5xx/lỗi kết nối là "nghi vấn chết".
+Strategy:
+    - Try HEAD first (lightweight, saves bandwidth).
+    - Some servers don't support HEAD (return 405) -> fall back to GET.
+    - There's a timeout + concurrency cap to avoid getting blocked/rate-limited.
+    - 2xx/3xx counts as "alive"; 4xx/5xx/connection errors count as "possibly dead".
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ class LinkCheckResult:
     ok: bool
     status_code: Optional[int]
     error: Optional[str]
-    final_url: Optional[str] = None  # khác url gốc nếu bị redirect
+    final_url: Optional[str] = None  # differs from the original url if redirected
 
 
 def _check_one(url: str, timeout: float) -> tuple[bool, Optional[int], Optional[str], Optional[str]]:
@@ -44,10 +45,11 @@ def _check_one(url: str, timeout: float) -> tuple[bool, Optional[int], Optional[
             needs_get_fallback = status_code == 405 or status_code >= 400
 
         if needs_get_fallback:
-            # Nhiều server chặn/không hỗ trợ HEAD -> thử lại bằng GET.
-            # Dùng stream=True + context manager để không tải hết nội dung
-            # về (chỉ cần status/headers) và LUÔN đóng kết nối, tránh rò rỉ
-            # connection pool khi quét hàng trăm/nghìn URL.
+            # Many servers block/don't support HEAD -> retry with GET.
+            # Use stream=True + a context manager so we don't download the
+            # full body (we only need status/headers) and ALWAYS close the
+            # connection, avoiding connection-pool leaks when scanning
+            # hundreds/thousands of URLs.
             with requests.get(
                 url, allow_redirects=True, timeout=timeout, headers=_DEFAULT_HEADERS,
                 stream=True,
@@ -66,8 +68,8 @@ def check_links(
     timeout: float = 10.0,
     progress_cb: Optional[Callable[[int, int], None]] = None,
 ) -> list[LinkCheckResult]:
-    """Kiểm tra toàn bộ bookmark trong `root` (đệ quy). Trả về danh sách kết
-    quả cho MỌI bookmark (cả sống lẫn chết) theo thứ tự hoàn thành."""
+    """Check every bookmark in `root` (recursively). Returns results for
+    EVERY bookmark (alive and dead alike), in completion order."""
     bookmarks = list(root.walk_bookmarks())
     results: list[LinkCheckResult] = []
     total = len(bookmarks)
@@ -93,8 +95,8 @@ def check_links(
 
 
 def remove_broken(root: Folder, broken_urls: set[str]) -> int:
-    """Xoá khỏi cây `root` các bookmark có url nằm trong `broken_urls`.
-    Trả về số lượng đã xoá."""
+    """Remove bookmarks whose url is in `broken_urls` from the `root` tree.
+    Returns the number removed."""
     removed = 0
 
     def _clean(folder: Folder) -> None:

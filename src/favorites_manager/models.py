@@ -1,4 +1,5 @@
-"""Cấu trúc dữ liệu cho bookmark/folder, dùng chung cho parser, dedupe, writer."""
+"""Core data structures for bookmarks/folders, shared by the parser, dedupe,
+and writer modules."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,7 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 @dataclass
 class Bookmark:
-    """Một bookmark (link) đơn lẻ."""
+    """A single bookmark (link)."""
 
     title: str
     url: str
@@ -22,13 +23,13 @@ class Bookmark:
 
     @property
     def normalized_url(self) -> str:
-        """URL đã chuẩn hoá để so sánh trùng lặp.
+        """Normalized URL used for duplicate comparison.
 
-        - bỏ khoảng trắng thừa
-        - hạ thường scheme/host
-        - bỏ dấu "/" cuối path (nếu path không rỗng)
-        - bỏ fragment (#...)
-        - giữ nguyên query string (vì có thể mang ý nghĩa khác nhau)
+        - strips surrounding whitespace
+        - lowercases scheme/host
+        - drops a trailing "/" on the path (treating "" and "/" as equal)
+        - drops the fragment (#...)
+        - keeps the query string (it can carry distinct meaning)
         """
         raw = self.url.strip()
         parts = urlsplit(raw)
@@ -44,7 +45,7 @@ class Bookmark:
 
 @dataclass
 class Folder:
-    """Một folder, có thể chứa bookmark con và folder con (đệ quy)."""
+    """A folder, which may contain child bookmarks and child folders (recursively)."""
 
     name: str
     add_date: Optional[str] = None
@@ -54,14 +55,14 @@ class Folder:
     subfolders: list["Folder"] = field(default_factory=list)
 
     def walk_bookmarks(self):
-        """Duyệt đệ quy toàn bộ bookmark trong folder này và các folder con."""
+        """Recursively yield every bookmark in this folder and its subfolders."""
         for bm in self.bookmarks:
             yield bm
         for sub in self.subfolders:
             yield from sub.walk_bookmarks()
 
     def walk_folders(self):
-        """Duyệt đệ quy toàn bộ folder (bao gồm chính nó)."""
+        """Recursively yield every folder (including this one)."""
         yield self
         for sub in self.subfolders:
             yield from sub.walk_folders()

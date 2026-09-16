@@ -51,7 +51,7 @@ def test_remove_duplicates_merges_tags_and_description():
 <DL><p>
     <DT><A HREF="https://example.com/" TAGS="a,b">Example</A>
     <DT><A HREF="https://example.com" TAGS="b,c">Example dup</A>
-    <DD>mô tả từ bản trùng
+    <DD>description from the duplicate
 </DL><p>
 """
     root = parse_html(html)
@@ -59,4 +59,4 @@ def test_remove_duplicates_merges_tags_and_description():
     assert removed == 1
     kept = root.bookmarks[0]
     assert set(kept.tags) == {"a", "b", "c"}
-    assert kept.description == "mô tả từ bản trùng"
+    assert kept.description == "description from the duplicate"
