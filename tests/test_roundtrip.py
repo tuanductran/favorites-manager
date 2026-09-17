@@ -1,3 +1,4 @@
+from favorites_manager.config import ConfigError, load_config
 from favorites_manager.dedupe import find_duplicates, remove_duplicates
 from favorites_manager.parser import parse_html
 from favorites_manager.writer import to_html
@@ -60,3 +61,35 @@ def test_remove_duplicates_merges_tags_and_description():
     kept = root.bookmarks[0]
     assert set(kept.tags) == {"a", "b", "c"}
     assert kept.description == "description from the duplicate"
+
+
+def test_load_config_rejects_malformed_json(tmp_path):
+    bad = tmp_path / "config.json"
+    bad.write_text('{"bookmarks": [{"url": "https://x.com",}]}', encoding="utf-8")
+    try:
+        load_config(bad)
+        assert False, "expected ConfigError"
+    except ConfigError as exc:
+        assert "invalid JSON" in str(exc)
+
+
+def test_load_config_rejects_missing_url_field(tmp_path):
+    bad = tmp_path / "config.json"
+    bad.write_text('{"bookmarks": [{"title": "no url"}]}', encoding="utf-8")
+    try:
+        load_config(bad)
+        assert False, "expected ConfigError"
+    except ConfigError as exc:
+        assert "bookmarks[0]" in str(exc)
+
+
+def test_load_config_accepts_valid_entry(tmp_path):
+    good = tmp_path / "config.json"
+    good.write_text(
+        '{"bookmarks": [{"url": "https://example.com", "title": "Ex", "folder": "A/B"}]}',
+        encoding="utf-8",
+    )
+    entries = load_config(good)
+    assert len(entries) == 1
+    assert entries[0].url == "https://example.com"
+    assert entries[0].folder == ("A", "B")

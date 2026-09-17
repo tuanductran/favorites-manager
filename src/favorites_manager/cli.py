@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .browsers import BROWSERS, build_for_browser
-from .config import add_entry, apply_entries, load_config
+from .config import ConfigError, add_entry, apply_entries, load_config
 from .dedupe import find_duplicates, remove_duplicates, remove_empty_folders
 from .linkcheck import check_links, remove_broken as remove_broken_bookmarks
 from .models import Folder
@@ -143,7 +143,10 @@ def list_folders(file: str) -> None:
 @click.option("--config", "config_path", default="config.json", show_default=True, type=click.Path())
 def add_url(url: str, title: str | None, folder: str, tags: str, description: str | None, config_path: str) -> None:
     """Add a URL to config.json (creating the file if needed)."""
-    entry = add_entry(config_path, url=url, title=title, folder=folder, tags=tags, description=description)
+    try:
+        entry = add_entry(config_path, url=url, title=title, folder=folder, tags=tags, description=description)
+    except ConfigError as exc:
+        raise click.UsageError(str(exc)) from exc
     console.print(
         f"[green]Added[/green] {entry.title} -> {entry.url} "
         f"(folder: {'/'.join(entry.folder) or '(root)'}) to [bold]{config_path}[/bold]"
@@ -177,7 +180,10 @@ def build(
 
     n_manual = 0
     if config_path:
-        entries = load_config(config_path)
+        try:
+            entries = load_config(config_path)
+        except ConfigError as exc:
+            raise click.UsageError(str(exc)) from exc
         n_manual = apply_entries(merged, entries)
 
     n_dupes = remove_duplicates(merged)

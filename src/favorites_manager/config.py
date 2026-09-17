@@ -31,6 +31,13 @@ from .models import Bookmark, Folder
 _FOLDER_SEP = "/"
 
 
+class ConfigError(ValueError):
+    """Raised for a malformed config.json — carries a message meant to be
+    shown directly to the user (no traceback), since config.json is meant
+    to be hand-edited and typos (trailing commas, a missing "url") are
+    expected to happen often."""
+
+
 @dataclass
 class ManualEntry:
     url: str
@@ -41,7 +48,11 @@ class ManualEntry:
     description: str | None = None
 
     @staticmethod
-    def from_dict(d: dict) -> "ManualEntry":
+    def from_dict(d: dict, index: int) -> "ManualEntry":
+        if "url" not in d or not d["url"]:
+            raise ConfigError(
+                f'config.json: bookmarks[{index}] is missing a "url" field.'
+            )
         url = d["url"]
         title = d.get("title") or url
         raw_folder = d.get("folder") or ""
@@ -72,8 +83,25 @@ def load_config(path: str | Path) -> list[ManualEntry]:
     p = Path(path)
     if not p.exists():
         return []
-    data = json.loads(p.read_text(encoding="utf-8") or "{}")
-    return [ManualEntry.from_dict(item) for item in data.get("bookmarks", [])]
+    raw = p.read_text(encoding="utf-8") or "{}"
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(
+            f"{p}: invalid JSON ({exc.msg} at line {exc.lineno}, column {exc.colno}). "
+            "Check for a trailing comma or an unquoted key."
+        ) from exc
+    if not isinstance(data, dict) or not isinstance(data.get("bookmarks", []), list):
+        raise ConfigError(
+            f'{p}: expected a top-level object with a "bookmarks" list, '
+            'e.g. {"bookmarks": [{"url": "https://example.com"}]}.'
+        )
+    entries = []
+    for i, item in enumerate(data.get("bookmarks", [])):
+        if not isinstance(item, dict):
+            raise ConfigError(f"config.json: bookmarks[{i}] must be an object.")
+        entries.append(ManualEntry.from_dict(item, i))
+    return entries
 
 
 def save_config(path: str | Path, entries: list[ManualEntry]) -> None:
