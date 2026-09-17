@@ -40,8 +40,8 @@ uv venv
 uv pip install -e .
 ```
 
-Requires Python **3.9+**. Dependencies: `beautifulsoup4`, `lxml`, `click`,
-`rich`, `requests` (all pure Python, no complex native builds needed).
+Requires Python **3.9+**. Dependencies: `beautifulsoup4`, `click`, `rich`,
+`requests` (all pure Python, no complex native builds needed).
 
 ## Usage (CLI: `favorites`)
 
@@ -205,6 +205,33 @@ nesting, which is already balanced in the source file) before parsing.
 - Actually tested on Python **3.9.25** (not just 3.11) to confirm modern
   type-hint syntax (`str | None`, `tuple[str, ...]`) works correctly thanks
   to `from __future__ import annotations` in every module.
+
+## Security audit (dependency CVEs)
+
+- **lxml removed entirely**: it was declared as a dependency but never
+  actually used — `parser.py` always calls `BeautifulSoup(html,
+  "html.parser")` (the pure-Python backend), never `BeautifulSoup(html,
+  "lxml")`. Keeping an unused native-code dependency around only adds
+  attack surface (e.g. it was recently flagged for CVE-2026-41066, an
+  XXE issue in lxml's XML entity-resolution default, which doesn't apply
+  here since we never touch lxml's XML APIs). Removed for both a smaller
+  install and one fewer thing to patch.
+- **`requests`/`urllib3` minimum versions raised**: `requests>=2.32.4`
+  (fixes CVE-2024-47081, a `.netrc` credential leak via crafted URLs) and
+  an explicit `urllib3>=2.6.3` pin (previously an *unpinned* transitive
+  dependency of `requests`, which permits urllib3 as old as `1.21.1`) —
+  fixes CVE-2025-66418 (unbounded decompression chain / DoS) and the
+  issues covered by Debian DSA-6102-1 (CVE-2025-50181, CVE-2026-21441).
+- **`click` minimum version raised, split by Python version**: CVE-2026-7246
+  is a command-injection bug in `click.edit()`, fixed in click 8.3.3 — but
+  click 8.2+ dropped support for Python 3.7/3.8/3.9, which conflicts with
+  this project's stated `>=3.9` support. The dependency is now
+  version-marker-split: Python **3.10+** installs get the patched
+  `click>=8.3.3`; Python **3.9** installs stay on the last 3.9-compatible
+  `8.1.x` line (unpatched upstream — there is no 3.9-compatible fixed
+  release). In practice this has **zero functional impact either way**:
+  this codebase never calls `click.edit()` anywhere.
+
 
 ## References (cross-checked directly against browser source code)
 

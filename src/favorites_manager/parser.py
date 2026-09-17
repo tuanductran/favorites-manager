@@ -13,8 +13,9 @@ Rough shape of the source file:
     </DL><p>
 
 This isn't valid XHTML (tags are never closed), so we use BeautifulSoup with
-the "html.parser"/"lxml" backend, which repairs the DOM tree the same way a
-browser would.
+the pure-Python "html.parser" backend, which repairs the DOM tree the same
+way a browser would (no lxml dependency required — html.parser is fine for
+this format and avoids pulling in a much larger native-code dependency).
 """
 from __future__ import annotations
 
